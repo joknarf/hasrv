@@ -29,7 +29,7 @@ function usage
 function try_connect
 {
     typeset host=$1 port=$2 timeout=${3:-2} 
-    ip=$(host $host |awk '/has address/{print $NF}')
+    ip=$(host $host |awk '/has address/{print $NF;exit;}')
     # resolve ip as /dev/tcp does not seem to use multiple dns servers configured
     [ ! "$ip" ] && echo "Warn: Cannot resolve host $host" >&2 && return 1
     timeout $timeout ksh -c "echo > /dev/tcp/$ip/$port" >/dev/null 2>&1 && return 0
