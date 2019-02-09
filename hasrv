@@ -1,0 +1,61 @@
+#!/bin/ksh -p
+# Author: FJO
+# hasrv
+# automatic fallback to alive server
+#
+
+function usage
+{
+    cat - <<'EOF' 
+usage: hasrv <host> <port> <backup1> <backup2> ...
+
+returns <host> if can connect to <host>:<port>
+if connection failed, returns first <backup> 
+that can be connected to <backup>:<port>
+
+can be used to switch to a backup server if 
+primary not available
+
+Example:
+  # server=$(hasrv myhost 22 mybackup1 mybackup2)
+  # ssh $server echo I can connect to this server on port 22
+
+EOF
+    exit 1
+}
+
+function try_connect
+{
+    typeset host=$1 port=$2 timeout=${3:-2} ip=$(getent hosts $host)
+    # resolve ip as /dev/tcp does not seem to use multiple dns servers configured
+    [ ! "$ip" ] && echo "Cannot resolve host $host" >&2 && return 1
+    echo "$ip" |read ip _
+    timeout $timeout ksh -c "echo > /dev/tcp/$1/$2" >/dev/null 2>&1 && return 0
+    echo "Cannot connect to $host ($ip) on port $port" >&2
+    return 1
+}
+
+function get_srv_up
+{
+    typeset host=$1 port=$2 backups=$3 backup=''
+    try_connect $host $port 3 && echo $host && return 0
+    for backup in $backups
+    do
+        [ "$backup" = "$host" ] && continue
+        try_connect $backup $port && break
+        backup=''
+    done
+    [ ! "$backup" ] && echo "Error: Cannot connect to any backup for $host on port $port" >&2 && return 1
+    echo "Warn: fallback to backup host: $backup" >&2
+    echo "$backup"
+    return 0
+}
+
+# Parameters
+[ $# -lt 2 ] && usage
+HOST=$1
+PORT=$2
+shift 2
+BACKUPS="$*"
+
+get_srv_up $HOST $PORT "$BACKUPS"
