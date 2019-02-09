@@ -6,21 +6,21 @@
 
 function usage
 {
-    cat - <<'EOF' 
-usage: hasrv <host> <port> <backup1> <backup2> ...
+    cat - <<-'EOF'
+	usage: hasrv <host> <port> <backup1> <backup2> ...
 
-returns <host> if can connect to <host>:<port>
-if connection failed, returns first <backup> 
-that can be connected to <backup>:<port>
+	returns <host> if can connect to <host>:<port>
+	if connection failed, returns first <backup> 
+	that can be connected to <backup>:<port>
 
-can be used to switch to a backup server if 
-primary not available
+	can be used to switch to a backup server if 
+	primary not available
 
-Example:
-  # server=$(hasrv myhost 22 mybackup1 mybackup2)
-  # ssh $server echo I can connect to this server on port 22
+	Example:
+	  # server=$(hasrv myhost 22 mybackup1 mybackup2)
+	  # ssh $server echo I can connect to this server on port 22
 
-EOF
+	EOF
     exit 1
 }
 
