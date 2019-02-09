@@ -15,6 +15,9 @@ function usage
 	if connection failed, returns first <backup> 
 	that can be connected to <backup>:<port>
 
+        if a host has multiple ip will return the name pointing
+        to the reverse of ip that can connect
+
 	can be used to switch to a backup server if 
 	primary not available
 
@@ -26,13 +29,28 @@ function usage
     exit 1
 }
 
+function connect_ip_port
+{
+    typeset ip=$1 port=$2 timeout=$3
+    timeout $timeout ksh -c "echo > /dev/tcp/$ip/$port" >/dev/null 
+}
+
 function try_connect
 {
-    typeset host=$1 port=$2 timeout=${3:-2} 
-    ip=$(host $host |awk '/has address/{print $NF;exit;}')
-    # resolve ip as /dev/tcp does not seem to use multiple dns servers configured
-    [ ! "$ip" ] && echo "Warn: Cannot resolve host $host" >&2 && return 1
-    timeout $timeout ksh -c "echo > /dev/tcp/$ip/$port" >/dev/null 2>&1 && return 0
+    typeset host=$1 port=$2 timeout=${3:-2} ips ip
+    ips=$(host $host |awk '/has address/{print $NF}')
+    [ ! "$ips" ] && echo "Warn: Cannot resolve host $host" >&2 && return 1
+    if [ $(echo "$ips"|wc -l) = 1 ];then # unique ip
+        connect_ip_port $ips $port $timeout && echo $host && return 0
+    else # return the hostname from the reverse of ip if can connect
+        for ip in $ips
+        do
+            if connect_ip_port $ip $port $timeout ; then
+                host $ip |awk '/name pointer/{sub("[.]$","");print $NF;exit}'
+                return 0
+            fi
+        done
+    fi
     echo "Warn: Cannot connect to $host ($ip) on port $port" >&2
     return 1
 }
@@ -40,12 +58,11 @@ function try_connect
 function get_srv_up
 {
     typeset host=$1 port=$2 backups=$3 backup=''
-    try_connect $host $port 3 && echo $host && return 0
+    try_connect $host $port 3 && return 0
     for backup in $backups
     do
         [ "$backup" = "$host" ] && continue
-        try_connect $backup $port && break
-        backup=''
+        backup=$(try_connect $backup $port) && break
     done
     [ ! "$backup" ] && echo "Error: Cannot connect to any backup for $host on port $port" >&2 && return 1
     echo "Warn: Fallback to backup host: $backup" >&2
