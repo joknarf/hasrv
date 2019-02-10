@@ -40,30 +40,25 @@ function ip2dec {
     echo  "$((a * 256 ** 3 + b * 256 ** 2 + c * 256 + d))"
 }
 
+function hosts2ips
+{
+    typeset hosts=$* host
+    for host in $hosts;do
+        host $host || echo "Warn: Cannot resolve $host" >&2
+    done |awk '/has address/{if (!ip[$NF]) print $NF;ip[$NF]=1}'
+}
+
+function ip2host
+{
+    typeset ip=$1
+    host $ip |awk '/name pointer/{sub("[.]$","");print $NF;exit}'
+}
+
 function connect_ip_port
 {
     typeset ip=$1 port=$2 timeout=$3
-    timeout $timeout ksh -c "echo > /dev/tcp/$ip/$port" >/dev/null 2>&1
-}
-
-function try_connect
-{
-    typeset host=$1 port=$2 timeout=${3:-2} ips ip
-    ips=$(host $host |awk '/has address/{print $NF}')
-    [ ! "$ips" ] && echo "Warn: Cannot resolve host $host" >&2 && return 1
-    if [ $(echo "$ips"|wc -l) = 1 ];then # unique ip, keep host name
-        ip=$ips
-        connect_ip_port $ip $port $timeout && echo $host && return 0
-    else # return the hostname from the reverse of ip if can connect
-        for ip in $ips
-        do
-            if connect_ip_port $ip $port $timeout ; then
-                host $ip |awk '/name pointer/{sub("[.]$","");print $NF;exit}'
-                return 0
-            fi
-        done
-    fi
-    echo "Warn: Cannot connect to $host ($ip) on port $port" >&2
+    timeout $timeout ksh -c "echo > /dev/tcp/$ip/$port" >/dev/null 2>&1 && return 0
+    echo "Warn: cannot connect to $(ip2host $ip) ($ip)" >&2
     return 1
 }
 
@@ -79,18 +74,24 @@ function auto_host
 
 function get_srv_up
 {
-    typeset host=$1 port=$2 backups=$3 backup=''
-    [ "$host" = '-auto' ] && host=$(auto_host $backups)
-    try_connect $host $port 3 && return 0
-    for backup in $backups
+    typeset host=$1 port=$2 backups=$3 backup='' timeout=3 ips ip
+    [ "$host" = "-auto" ] && host=""
+    ips=$(hosts2ips $host $backups)
+    ips=$(echo $ips)
+    [ ! "$host" ] && ips="$(auto_host $ips) $ips"
+    ip=${ips%% *}
+    connect_ip_port $ip $port 3 && ip2host $ip && return 0
+    for ip in ${ips#* }
     do
-        [ "$backup" = "$host" ] && continue
-        backup=$(try_connect $backup $port) && break
+        if connect_ip_port $ip $port $timeout;then
+            backup=$(ip2host $ip)
+            echo "Warn: Fallback to backup host: $backup" >&2
+            echo "$backup"
+            return 0
+        fi
     done
-    [ ! "$backup" ] && echo "Error: Cannot connect to any backup for $host on port $port" >&2 && return 1
-    echo "Warn: Fallback to backup host: $backup" >&2
-    echo "$backup"
-    return 0
+    echo "Error: Cannot connect to any backup for $host on port $port" >&2 && return 1
+    return 1
 }
 
 # Parameters
