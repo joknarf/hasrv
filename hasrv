@@ -1,7 +1,7 @@
 #!/bin/ksh -p
 # Author: FJO
 # hasrv
-# automatic fallback to alive server
+# automatic fallback and load balance to alive server
 #
 
 PATH=/bin:/sbin:/usr/bin:/usr/sbin
@@ -10,6 +10,7 @@ function usage
 {
     cat - <<-'EOF'
 	usage: hasrv <host> <port> <backup1> <backup2> ...
+	       hasrv -auto <port> <backup1> <backup2> ...
 
 	returns <host> if can connect to <host>:<port>
 	if connection failed, returns first <backup> 
@@ -21,6 +22,10 @@ function usage
 	can be used to switch to a backup server if 
 	primary not available
 
+        with -auto will give a server according to client ip
+        to be used to load balance to different servers
+        can replace haproxy which stays a spof in infrastructure
+        
 	Example:
 	  # server=$(hasrv myhost 22 mybackup1 mybackup2)
 	  # ssh $server echo I can connect to this server on port 22
@@ -29,10 +34,16 @@ function usage
     exit 1
 }
 
+function ip2dec {
+    typeset a b c d ip=$@
+    IFS=. read -r a b c d <<<"$ip"
+    echo  "$((a * 256 ** 3 + b * 256 ** 2 + c * 256 + d))"
+}
+
 function connect_ip_port
 {
     typeset ip=$1 port=$2 timeout=$3
-    timeout $timeout ksh -c "echo > /dev/tcp/$ip/$port" >/dev/null 
+    timeout $timeout ksh -c "echo > /dev/tcp/$ip/$port" >/dev/null 2>&1
 }
 
 function try_connect
@@ -40,8 +51,9 @@ function try_connect
     typeset host=$1 port=$2 timeout=${3:-2} ips ip
     ips=$(host $host |awk '/has address/{print $NF}')
     [ ! "$ips" ] && echo "Warn: Cannot resolve host $host" >&2 && return 1
-    if [ $(echo "$ips"|wc -l) = 1 ];then # unique ip
-        connect_ip_port $ips $port $timeout && echo $host && return 0
+    if [ $(echo "$ips"|wc -l) = 1 ];then # unique ip, keep host name
+        ip=$ips
+        connect_ip_port $ip $port $timeout && echo $host && return 0
     else # return the hostname from the reverse of ip if can connect
         for ip in $ips
         do
@@ -55,9 +67,20 @@ function try_connect
     return 1
 }
 
+# choose a host in list according to local ip
+function auto_host
+{
+    typeset host=$(uname -n) ip ipnum n
+    ip=$(host $host |awk '/has address/{print $NF;exit}')
+    ipnum=$(ip2dec $ip)
+    n=$(( $ipnum % $# + 1))
+    eval echo '$'$n
+}
+
 function get_srv_up
 {
     typeset host=$1 port=$2 backups=$3 backup=''
+    [ "$host" = '-auto' ] && host=$(auto_host $backups)
     try_connect $host $port 3 && return 0
     for backup in $backups
     do
