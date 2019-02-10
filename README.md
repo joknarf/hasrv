@@ -1,5 +1,7 @@
 # hasrv
 
+Simple client side load balancer and fallback to servers
+
 ```
 usage: hasrv <host> <port> <backup1> <backup2> ...
        hasrv -auto <port> <backup1> <backup2> ...
@@ -16,8 +18,8 @@ can be used to switch to a backup server if
 primary not available
 
 with -auto will give a server according to client ip
-to be used to load balance to different servers
-can replace haproxy which stays a spof in infrastructure
+to be used to load balance to different servers.  
+can be used to replace haproxy which stays a spof in infrastructure
 
 ```shell
 Example:
