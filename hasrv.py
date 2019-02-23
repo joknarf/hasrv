@@ -18,6 +18,8 @@
 
 import socket, struct, sys, argparse
 from logging import warning, info
+from multiprocessing import Process, Queue, Pool
+from random import shuffle
 
 class Hasrv():
     def __init__(self, primaries, servers, port, timeout=3, resolve=False):
@@ -94,12 +96,35 @@ class Hasrv():
         warning("cannot connect to any server on port " + str(self.port))
         return None
 
+    def child_connect(self, q, server):
+        if self.connect(server, self.port, self.timeout):
+           q.put(server)
+
+    def get_first_alive(self):
+         q = Queue()
+         processes = []
+         servers = self.servers
+         shuffle(servers)
+         for server in servers:
+           p = Process(target=self.child_connect, args=(q, server))
+           p.start()
+           processes.append(p)
+         try:
+             server = q.get(True, self.timeout)
+         except:
+             server = None
+         for p in processes:
+             p.terminate() 
+         return server
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--primaries', '-P', default='')
     parser.add_argument('--servers', '-s' )
-    parser.add_argument('--port', '-p', type=int)
+    parser.add_argument('--port', '-p', type=int, required=True)
     parser.add_argument('--resolve', '-r', action='store_true')
+    parser.add_argument('--first', '-f', action='store_true')
     args = parser.parse_args()
     primaries = args.primaries.split()
     backups = args.servers.split("\n")
@@ -112,7 +137,10 @@ def main():
             if [p for p in primaries if p in s]:
                 servers = s
                 break
-    hasrv=Hasrv(primaries, servers, args.port, resolve=args.resolve).get_alive()
+    if args.first:
+        hasrv=Hasrv(primaries, servers, args.port, resolve=args.resolve).get_first_alive()
+    else:
+        hasrv=Hasrv(primaries, servers, args.port, resolve=args.resolve).get_alive()
     if hasrv:
         print(hasrv)
         sys.exit(0)
