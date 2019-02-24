@@ -16,8 +16,14 @@
 # the IPs
 #
 
-import socket, struct, sys, argparse
-from logging import warning, info
+import socket, struct, sys, os, argparse
+try:
+    import configparser
+except:
+    import ConfigParser
+from logging import error, warning, info, basicConfig, DEBUG
+from multiprocessing import Process, Queue, Pool
+from random import shuffle
 
 class Hasrv():
     def __init__(self, primaries, servers, port, timeout=3, resolve=False):
@@ -94,25 +100,82 @@ class Hasrv():
         warning("cannot connect to any server on port " + str(self.port))
         return None
 
+    def child_connect(self, q, server):
+        if self.connect(server, self.port, self.timeout):
+           q.put(server)
+
+    def get_first_alive(self):
+         q = Queue()
+         processes = []
+         servers = self.servers
+         shuffle(servers)
+         for server in servers:
+           p = Process(target=self.child_connect, args=(q, server))
+           p.start()
+           processes.append(p)
+         try:
+             server = q.get(True, self.timeout+1)
+         except:
+             server = None
+         for p in processes:
+             p.terminate() 
+         return server
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--primaries', '-P', default='')
-    parser.add_argument('--servers', '-s' )
-    parser.add_argument('--port', '-p', type=int)
-    parser.add_argument('--resolve', '-r', action='store_true')
+    parser.add_argument('--primaries',  '-P', default='')
+    parser.add_argument('--servers',    '-s', default='' )
+    parser.add_argument('--port',       '-p', type=int, default=0)
+    parser.add_argument('--timeout',    '-t', type=int, default=0)
+    parser.add_argument('--resolve',    '-r', action='store_true')
+    parser.add_argument('--first',      '-f', action='store_true')
+    parser.add_argument('--config',     '-c')
+    parser.add_argument('--configfile', '-C', default='/etc/hasrv.conf')
+    parser.add_argument('--verbose',    '-v', action='store_true')
     args = parser.parse_args()
-    primaries = args.primaries.split()
-    backups = args.servers.split("\n")
-    servers = []
+    options = vars(args).copy()
+    options = {k:str(v) for (k,v) in options.items()}
+    try:
+        config = configparser.ConfigParser(options, allow_no_calue=True)
+    except:
+        config = ConfigParser.ConfigParser(options, allow_no_value=True)
+    config.read([args.configfile, sys.path[0]+'/hasrv.conf', os.path.expanduser('~/.hasrv.conf')])
+    section = args.config
+    if not section:
+        section = 'noconf'
+    if section not in config.sections():
+        if section != 'noconf':
+            warning('cannot find section "' + section + '" in config file ' + args.configfile)
+        config.add_section(section)
+    options = {k:v for (k,v) in options.items() if v not in ['', '0','None','False']}
+    primaries = config.get(section, 'primaries', 0, options).split()
+    backups   = config.get(section, 'servers', 0, options).split("\n")
+    port      = int(config.get(section, 'port', 0, options))
+    if port == 0:
+        warning('port is required')
+        sys.exit(1)
+    timeout   = int(config.get(section, 'timeout', 0, options))
+    timeout   = 3 if timeout==0 else timeout
+    resolve   = False if config.get(section, 'resolve', 0, options) in ['False','false','0'] else True
+    first     = False if config.get(section, 'first',   0, options) in ['False','false','0'] else True
+    verbose   = False if config.get(section, 'verbose', 0, options) in ['False','false','0'] else True
+    if verbose:
+        basicConfig(level=DEBUG)
+    servers   = []
     if len(backups) == 1:
         servers = backups[0].split()
     else: # multiple list of servers find the list containing primary
+        if not primaries:
+            servers = config.get(section, 'servers').split()
         for b in backups:
             s = b.split()
             if [p for p in primaries if p in s]:
                 servers = s
                 break
-    hasrv=Hasrv(primaries, servers, args.port, resolve=args.resolve).get_alive()
+    if first:
+        hasrv=Hasrv(primaries, servers, port, timeout=timeout,resolve=resolve).get_first_alive()
+    else:
+        hasrv=Hasrv(primaries, servers, port, timeout=timeout,resolve=resolve).get_alive()
     if hasrv:
         print(hasrv)
         sys.exit(0)
