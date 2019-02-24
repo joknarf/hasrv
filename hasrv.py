@@ -136,9 +136,9 @@ def str2bool(str):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--primaries',  '-P', default='')
+    parser.add_argument('--primaries',  '-p', default='')
     parser.add_argument('--servers',    '-s', default='' )
-    parser.add_argument('--port',       '-p', type=int, default=0)
+    parser.add_argument('--port',       '-P', type=int, default=0)
     parser.add_argument('--timeout',    '-t', type=int, default=0)
     parser.add_argument('--resolve',    '-r', action='store_true')
     parser.add_argument('--first',      '-f', action='store_true')
