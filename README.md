@@ -100,7 +100,9 @@ hasrv.conf
 [mycluster]
 servers=server1.domain server2.domain
         server3.domain server4.domain
-        
+port=80
+first=true
+
 # hasrv.py --primaries server3.domain --config mycluster
 WARNING:root:connect server3.domain on port 22: timed out
 server4.domain
