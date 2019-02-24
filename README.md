@@ -14,9 +14,9 @@ usage: hasrv.py [-h] [--primaries PRIMARIES] [--servers SERVERS] [--port PORT]
 
 optional arguments:
   -h, --help            show this help message and exit
-  --primaries PRIMARIES, -P PRIMARIES
+  --primaries PRIMARIES, -p PRIMARIES
   --servers SERVERS, -s SERVERS
-  --port PORT, -p PORT
+  --port PORT, -P PORT
   --timeout TIMEOUT, -t TIMEOUT
   --resolve, -r
   --first, -f
