@@ -104,10 +104,9 @@ class Hasrv():
         if self.connect(server, self.port, self.timeout):
            q.put(server)
 
-    def get_first_alive(self):
+    def multi_connect(self, servers):
          q = Queue()
          processes = []
-         servers = self.servers
          shuffle(servers)
          for server in servers:
            p = Process(target=self.child_connect, args=(q, server))
@@ -120,6 +119,20 @@ class Hasrv():
          for p in processes:
              p.terminate() 
          return server
+     
+    def get_first_alive(self):
+        server = None
+        if self.primaries:
+            server = self.multi_connect(self.primaries)
+            if server:
+                return server
+        if self.servers:
+            server = self.multi_connect(self.servers)
+        return server
+        
+
+def str2bool(str):
+    return False if str in ['False','false','0'] else True
 
 def main():
     parser = argparse.ArgumentParser()
@@ -156,9 +169,9 @@ def main():
         sys.exit(1)
     timeout   = int(config.get(section, 'timeout', 0, options))
     timeout   = 3 if timeout==0 else timeout
-    resolve   = False if config.get(section, 'resolve', 0, options) in ['False','false','0'] else True
-    first     = False if config.get(section, 'first',   0, options) in ['False','false','0'] else True
-    verbose   = False if config.get(section, 'verbose', 0, options) in ['False','false','0'] else True
+    resolve   = str2bool(config.get(section, 'resolve', 0, options)) 
+    first     = str2bool(config.get(section, 'first',   0, options))
+    verbose   = str2bool(config.get(section, 'verbose', 0, options))
     if verbose:
         basicConfig(level=DEBUG)
     servers   = []
