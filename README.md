@@ -93,7 +93,7 @@ configuration file is by default searched in :
 * ~/.hasrv.conf
 * /etc/hasrv.conf
 
-### multiple fallback according to primary
+### different fallback servers according to primary
 
 ```
 hasrv.conf
