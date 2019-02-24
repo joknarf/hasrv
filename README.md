@@ -2,6 +2,11 @@
 
 client side load balancer and fallback to servers
 
+hasrv.py can be used to load balance connexions and fallback connexions to alive servers.
+hasrv.py tries to connect to servers on the port specified and returns a server name that is reachable on the port.
+
+typically can be used to load balance and secure API calls to front-ends.
+
 ```shell
 usage: hasrv.py [-h] [--primaries PRIMARIES] [--servers SERVERS] [--port PORT]
                 [--timeout TIMEOUT] [--resolve] [--first] [--config CONFIG]
