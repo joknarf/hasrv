@@ -34,8 +34,8 @@ optional arguments:
 # hasrv.py --primaries 'server1.domain server2.domain' --servers server3.domain --port 80
 ```
 
-will choose server1.domain or server2.domain based on IP of client
-fallback to other primary if primary chosen is not responding
+will choose server1.domain or server2.domain based on IP of client  
+fallback to other primary if primary chosen is not responding  
 fallback to server3.domain if none of primaries is responding
 
 ### choose first server responding
@@ -64,9 +64,9 @@ cluster1.domain has address 10.0.0.12
 # hasrv.py --resolve --servers cluster1.domain
 server2.domain
 ```
-will load balance and fallback between server1.domain server2.domain and server3.domain.
-can use a backup cluster with `--servers cluster2.domain`
-can choose `--first` if you want to get the first server responding
+will load balance and fallback between server1.domain server2.domain and server3.domain.  
+can use a backup cluster with `--servers cluster2.domain`  
+can choose `--first` if you want to get the first server responding  
 
 ### use configuration file
 
@@ -80,13 +80,13 @@ first=true
 ```
 
 ```
-# hasrv.py -c mycluster
+# hasrv.py --config mycluster
 server1.domain
 ```
-configuration file is by default searched in :
-hasrv.conf file in the directory of hasrv.py
-~/.hasrv.conf
-/etc/hasrv.conf
+configuration file is by default searched in :  
+* hasrv.conf file in the directory of hasrv.py
+* ~/.hasrv.conf
+* /etc/hasrv.conf
 
 ### multiple fallback according to primary
 
@@ -96,7 +96,7 @@ hasrv.conf
 servers=server1.domain server2.domain
         server3.domain server4.domain
         
-# hasrv.py -p server3.domain -c mycluster
+# hasrv.py --primaries server3.domain --config mycluster
 WARNING:root:connect server3.domain on port 22: timed out
 server4.domain
 ```
